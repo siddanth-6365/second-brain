@@ -1,0 +1,154 @@
+{
+  "nodes": [
+    {
+      "id": "a7c9df8d-5a8c-4382-b158-0eeb42d84f7f",
+      "label": "I work as a Software Engineer at TechCorp, focusing on backend development with Python and FastAPI.",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:12.991198",
+      "full_content": "I work as a Software Engineer at TechCorp, focusing on backend development with Python and FastAPI."
+    },
+    {
+      "id": "0381fa84-12b2-4bdd-af82-b8dab26e7014",
+      "label": "I now work as a Senior Engineering Manager at TechCorp, leading a team of 8 engineers across backend",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.094975",
+      "full_content": "I now work as a Senior Engineering Manager at TechCorp, leading a team of 8 engineers across backend and frontend."
+    },
+    {
+      "id": "cf214488-d9b4-4d7f-a12b-58a085ef7731",
+      "label": "I'm currently working on building a scalable API platform for our microservices architecture.",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.171884",
+      "full_content": "I'm currently working on building a scalable API platform for our microservices architecture."
+    },
+    {
+      "id": "2932ee03-abed-442b-8f6f-634fe6b7ecf3",
+      "label": "The API platform uses FastAPI with PostgreSQL database, Redis for caching, and Docker for containeri",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.245185",
+      "full_content": "The API platform uses FastAPI with PostgreSQL database, Redis for caching, and Docker for containerization. We're aiming for 99.9% uptime."
+    },
+    {
+      "id": "2007deda-8bd6-4ec8-8949-d7b87b5d9ebe",
+      "label": "I'm learning about AI and machine learning fundamentals through online courses. Just started with ba",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.272350",
+      "full_content": "I'm learning about AI and machine learning fundamentals through online courses. Just started with basic neural networks."
+    },
+    {
+      "id": "8031dd5e-28f7-4876-801d-d0656f170ef1",
+      "label": "I've now completed 3 AI courses and built my first machine learning model using TensorFlow. Currentl",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.337688",
+      "full_content": "I've now completed 3 AI courses and built my first machine learning model using TensorFlow. Currently working on a computer vision project."
+    },
+    {
+      "id": "2bf07973-2df6-4aa1-befc-16dbed8b22df",
+      "label": "I enjoy photography, especially landscape and street photography. I shoot with a Canon EOS R5.",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.356635",
+      "full_content": "I enjoy photography, especially landscape and street photography. I shoot with a Canon EOS R5."
+    },
+    {
+      "id": "bc906e75-8ada-40e2-933b-d705665b3e8b",
+      "label": "For landscape photography, I focus on golden hour lighting and use a tripod for long exposures. I al",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.421726",
+      "full_content": "For landscape photography, I focus on golden hour lighting and use a tripod for long exposures. I also shoot in RAW for better post-processing control."
+    },
+    {
+      "id": "977c57c7-daf8-4c62-bf45-dba01b3f2e03",
+      "label": "My fitness goal is to run a marathon by the end of the year. Currently running 20 miles per week.",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.439288",
+      "full_content": "My fitness goal is to run a marathon by the end of the year. Currently running 20 miles per week."
+    },
+    {
+      "id": "f5ae39fc-1f86-458a-a16d-a5833a680093",
+      "label": "I follow a high-protein, balanced diet with lots of vegetables. I eat 5 small meals a day to maintai",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.455341",
+      "full_content": "I follow a high-protein, balanced diet with lots of vegetables. I eat 5 small meals a day to maintain energy for training."
+    },
+    {
+      "id": "5d39c2ff-adc3-47b8-a162-38e0a8ff0dd3",
+      "label": "I maintain a strict sleep schedule of 8 hours per night, going to bed at 10 PM and waking at 6 AM fo",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.521058",
+      "full_content": "I maintain a strict sleep schedule of 8 hours per night, going to bed at 10 PM and waking at 6 AM for my morning run."
+    },
+    {
+      "id": "f927baca-7d8c-47fe-96fc-651beb83496e",
+      "label": "Currently reading 'Designing Data-Intensive Applications' by Martin Kleppmann. Great insights on dis",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.593630",
+      "full_content": "Currently reading 'Designing Data-Intensive Applications' by Martin Kleppmann. Great insights on distributed systems and databases."
+    },
+    {
+      "id": "085d9547-6f6c-4482-a2ff-76db32396392",
+      "label": "Also reading 'The Lean Startup' by Eric Ries to better understand product development and startup me",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.655217",
+      "full_content": "Also reading 'The Lean Startup' by Eric Ries to better understand product development and startup methodologies."
+    },
+    {
+      "id": "7728ceac-305a-4716-a9af-35b18bead373",
+      "label": "Planning a 2-week trip to Japan in spring to see cherry blossoms in Tokyo and Kyoto.",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.722483",
+      "full_content": "Planning a 2-week trip to Japan in spring to see cherry blossoms in Tokyo and Kyoto."
+    },
+    {
+      "id": "4f7b0231-6e94-46d4-9524-4df964b81cab",
+      "label": "Started learning Japanese basics on Duolingo. Can introduce myself and order food in Japanese now.",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.745633",
+      "full_content": "Started learning Japanese basics on Duolingo. Can introduce myself and order food in Japanese now."
+    },
+    {
+      "id": "5bd2ecae-0200-46ed-a5db-58f15fb83408",
+      "label": "Fascinated by Japanese tea ceremonies and traditional architecture. Planning to visit temples and at",
+      "is_latest": true,
+      "is_active": true,
+      "created_at": "2025-10-22T19:57:13.765096",
+      "full_content": "Fascinated by Japanese tea ceremonies and traditional architecture. Planning to visit temples and attend a tea ceremony during my trip."
+    }
+  ],
+  "edges": [
+    {
+      "id": "421ff03c-5c58-43b4-a6be-5a54ede5367a",
+      "source": "8031dd5e-28f7-4876-801d-d0656f170ef1",
+      "target": "2007deda-8bd6-4ec8-8949-d7b87b5d9ebe",
+      "type": "extends",
+      "confidence": 0.6739899,
+      "reason": "Additional context for related topic (similarity: 0.67)"
+    }
+  ],
+  "stats": {
+    "total_memories": 16,
+    "total_relationships": 1,
+    "graph_nodes": 16,
+    "graph_edges": 1,
+    "relationship_types": {
+      "updates": 0,
+      "extends": 1,
+      "derives": 0,
+      "similar": 0
+    }
+  }
+}
