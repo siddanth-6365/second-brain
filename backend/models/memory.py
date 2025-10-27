@@ -84,8 +84,8 @@ class Memory(BaseModel):
     accessed_at: Optional[datetime] = None  # Last time this memory was retrieved
     expires_at: Optional[datetime] = None  # When this memory should expire
     
-    # Relationships
-    relationships: List[MemoryRelationship] = Field(default_factory=list)
+    # Relationships (store only IDs to avoid circular references)
+    relationship_ids: List[str] = Field(default_factory=list)
     
     # Statistics
     access_count: int = 0  # How many times this memory has been retrieved

@@ -3,7 +3,7 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime as dt
 from pydantic import BaseModel
 
 from backend.config import settings
@@ -17,6 +17,13 @@ from backend.services import (
 
 import logging
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # Groq client (optional)
 try:
     from groq import Groq
@@ -24,13 +31,6 @@ try:
 except ImportError:
     GROQ_AVAILABLE = False
     logger.warning("Groq package not installed. Chat functionality will be limited.")
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -57,7 +57,7 @@ async def root():
         "name": settings.app_name,
         "version": settings.app_version,
         "status": "running",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": dt.utcnow().isoformat()
     }
 
 
@@ -69,7 +69,7 @@ async def health_check():
     
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": dt.utcnow().isoformat(),
         "stats": stats
     }
 
@@ -86,28 +86,71 @@ async def ingest_document(
     The document will be chunked, embedded, and indexed into the knowledge graph.
     """
     try:
-        content = request.get("content")
-        title = request.get("title")
-        source = request.get("source")
+        content = request.get("content", "").strip()
+        title = request.get("title", "").strip()
+        source = request.get("source", "").strip()
         
+        # Validation
         if not content:
             raise HTTPException(status_code=400, detail="Content is required")
+        
+        # Max content size: 1MB
+        if len(content) > 1_000_000:
+            raise HTTPException(
+                status_code=413,
+                detail="Content too large. Maximum size is 1MB"
+            )
+        
+        # Min content size: 10 characters
+        if len(content) < 10:
+            raise HTTPException(
+                status_code=400,
+                detail="Content too short. Minimum 10 characters required"
+            )
+        
+        # Validate title length
+        if title and len(title) > 500:
+            raise HTTPException(
+                status_code=400,
+                detail="Title too long. Maximum 500 characters"
+            )
+        
+        # Validate source length
+        if source and len(source) > 500:
+            raise HTTPException(
+                status_code=400,
+                detail="Source too long. Maximum 500 characters"
+            )
         
         ingestion_service = get_ingestion_service()
         document = await ingestion_service.ingest_text(
             text=content,
-            title=title,
-            source=source
+            title=title if title else None,
+            source=source if source else None
         )
         return document
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error ingesting document: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/documents/{document_id}/memories", response_model=List[Memory])
-async def get_document_memories(document_id: str):
-    """Get all memories created from a document"""
+async def get_document_memories(document_id: str, skip: int = 0, limit: int = 50):
+    """
+    Get memories created from a document with pagination.
+    
+    Args:
+        document_id: Document ID
+        skip: Number of results to skip (default: 0)
+        limit: Maximum results to return (default: 50, max: 500)
+    """
+    if limit > 500:
+        limit = 500
+    if skip < 0:
+        skip = 0
+    
     graph_store = get_graph_store()
     memories = [
         m for m in graph_store.get_all_memories()
@@ -117,7 +160,8 @@ async def get_document_memories(document_id: str):
     if not memories:
         raise HTTPException(status_code=404, detail="Document not found or has no memories")
     
-    return memories
+    # Apply pagination
+    return memories[skip:skip + limit]
 
 
 # Memory endpoints
@@ -196,14 +240,14 @@ class ChatRequest(BaseModel):
     """Request model for chat endpoint"""
     question: str
     max_memories: int = 5
-    model: str = "llama-3.1-70b-versatile"  # Groq model
+    model: str = "openai/gpt-oss-20b"  # Groq model
     
     class Config:
         json_schema_extra = {
             "example": {
                 "question": "What are my favorite foods?",
                 "max_memories": 5,
-                "model": "llama-3.1-70b-versatile"
+                "model": "openai/gpt-oss-20b"
             }
         }
 
@@ -356,7 +400,7 @@ async def clear_all_data():
         return {
             "status": "success",
             "message": "All memories and relationships have been cleared",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": dt.utcnow().isoformat()
         }
         
     except Exception as e:
@@ -367,4 +411,5 @@ async def clear_all_data():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 

@@ -33,9 +33,25 @@ class Settings(BaseSettings):
     similarity_threshold_update: float = 0.70  # High similarity = likely an update
     similarity_threshold_extend: float = 0.60  # Medium similarity = likely extends
     
+    # Memory Tiering Configuration
+    hot_memory_age_days: int = 30  # Memories younger than this are "hot"
+    hot_memory_access_threshold: int = 5  # Memories accessed more than this are "hot"
+    cold_storage_enabled: bool = True  # Enable hot/cold tiering
+    
+    # Time Decay Configuration
+    time_decay_half_life_days: int = 90  # Days for score to decay to 50%
+    
+    # CORS Configuration
+    allowed_origins: Optional[str] = None  # Comma-separated list of allowed origins
+    
+    # Rate Limiting (Optional)
+    rate_limit_requests: Optional[int] = None  # Max requests per period
+    rate_limit_period: Optional[int] = None  # Period in seconds
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra fields from .env
 
 
 settings = Settings()

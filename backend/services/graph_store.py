@@ -54,11 +54,11 @@ class GraphStore:
             created_at=relationship.created_at.isoformat()
         )
         
-        # Update the memory's relationships list
+        # Update the memory's relationship IDs (avoid circular references)
         if relationship.from_memory_id in self.memories:
             memory = self.memories[relationship.from_memory_id]
-            if relationship not in memory.relationships:
-                memory.relationships.append(relationship)
+            if relationship.id not in memory.relationship_ids:
+                memory.relationship_ids.append(relationship.id)
         
         logger.debug(
             f"Added relationship: {relationship.from_memory_id} "

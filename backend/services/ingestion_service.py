@@ -7,6 +7,8 @@ from backend.models import Document, Memory, MemoryRelationship, RelationshipTyp
 from backend.services.embedding_service import get_embedding_service
 from backend.services.vector_store import get_vector_store
 from backend.services.graph_store import get_graph_store
+from backend.services.memory_tiering import get_memory_tiering
+from backend.services.entity_service import get_entity_service
 from backend.config import settings
 import logging
 
@@ -20,6 +22,8 @@ class IngestionService:
         self.embedding_service = get_embedding_service()
         self.vector_store = get_vector_store()
         self.graph_store = get_graph_store()
+        self.memory_tiering = get_memory_tiering()
+        self.entity_service = get_entity_service()
     
     def chunk_text(self, text: str, chunk_size: int = None, overlap: int = None) -> List[str]:
         """
@@ -141,6 +145,12 @@ class IngestionService:
             # Create memories
             memories = []
             for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+                # Extract entities from chunk
+                entities_dict = self.entity_service.extract_entities(chunk)
+                entities_list = []
+                for entity_type, entity_set in entities_dict.items():
+                    entities_list.extend(entity_set)
+                
                 memory = Memory(
                     content=chunk,
                     document_id=document.id,
@@ -148,10 +158,12 @@ class IngestionService:
                     embedding=embedding,
                     embedding_model=settings.embedding_model,
                     keywords=self.extract_keywords(chunk),
+                    entities=entities_list,
                     metadata={
                         "source": document.source,
                         "document_type": document.document_type,
-                        "title": document.title
+                        "title": document.title,
+                        "entities_by_type": {k: list(v) for k, v in entities_dict.items()}
                     }
                 )
                 memories.append(memory)
@@ -166,6 +178,14 @@ class IngestionService:
             
             # Add to vector store (so they're searchable)
             self.vector_store.add_memories_batch(memories)
+            
+            # Classify memories into hot/cold tiers
+            for memory in memories:
+                tier = self.memory_tiering.classify_memory(memory)
+                if tier == 'hot':
+                    self.memory_tiering.add_to_hot(memory)
+                else:
+                    self.memory_tiering.add_to_cold(memory)
             
             # Detect relationships with existing memories (now that new memories are in vector store)
             await self._detect_relationships(memories)
@@ -330,52 +350,96 @@ class IngestionService:
     
     async def _detect_derives_relationships(self, new_memories: List[Memory]):
         """
-        Detect DERIVES relationships by analyzing patterns across memories.
-        This is a basic implementation that looks for common themes and connections.
+        Detect DERIVES relationships using entity-based analysis.
+        
+        DERIVES relationships are created when:
+        1. Shared entities (persons, organizations, locations) exist
+        2. Keyword overlap is significant (>= 0.3)
+        3. Memories are not already related by UPDATES/EXTENDS
+        
+        This is more accurate than keyword-only matching.
         """
         all_memories = self.graph_store.get_all_memories()
         
         for new_memory in new_memories:
-            # Look for patterns that might suggest derived relationships
+            # Extract entities from new memory
+            new_entities = self.entity_service.extract_entities(new_memory.content)
             new_keywords = set(new_memory.keywords)
             
             for existing_memory in all_memories:
                 if existing_memory.id == new_memory.id:
                     continue
-                    
+                
+                # Check if already related
+                existing_relationships = self.graph_store.get_relationships(new_memory.id, direction="both")
+                already_related = any(
+                    rel.to_memory_id == existing_memory.id or rel.from_memory_id == existing_memory.id
+                    for rel in existing_relationships
+                )
+                
+                if already_related:
+                    continue
+                
+                # Extract entities from existing memory
+                existing_entities = self.entity_service.extract_entities(existing_memory.content)
                 existing_keywords = set(existing_memory.keywords)
                 
-                # Find common keywords
-                common_keywords = new_keywords.intersection(existing_keywords)
+                # Calculate entity-based similarity
+                entity_similarity = self.entity_service.calculate_entity_similarity(
+                    new_entities, existing_entities
+                )
                 
-                # If they share significant keywords but aren't too similar, might be DERIVES
-                if len(common_keywords) >= 2:  # At least 2 common keywords
-                    # Check if they're not already related
-                    existing_relationships = self.graph_store.get_relationships(new_memory.id, direction="both")
-                    already_related = any(
-                        rel.to_memory_id == existing_memory.id or rel.from_memory_id == existing_memory.id
-                        for rel in existing_relationships
+                # Get shared entities for reasoning
+                shared_entities = self.entity_service.get_shared_entities(
+                    new_entities, existing_entities
+                )
+                
+                # Calculate keyword overlap
+                common_keywords = new_keywords.intersection(existing_keywords)
+                keyword_overlap = (
+                    len(common_keywords) / max(len(new_keywords), len(existing_keywords))
+                    if max(len(new_keywords), len(existing_keywords)) > 0 else 0.0
+                )
+                
+                # DERIVES criteria:
+                # - Entity similarity > 0.2 (shared entities)
+                # - OR keyword overlap >= 0.3
+                should_derive = entity_similarity > 0.2 or keyword_overlap >= 0.3
+                
+                if should_derive:
+                    # Combined confidence: weight entity similarity higher
+                    confidence = (entity_similarity * 0.6) + (keyword_overlap * 0.4)
+                    
+                    # Build reason with entity information
+                    reason_parts = []
+                    if entity_similarity > 0.2:
+                        # Collect non-empty entity types
+                        entity_types_shared = [
+                            entity_type for entity_type, entities in shared_entities.items()
+                            if entities
+                        ]
+                        if entity_types_shared:
+                            reason_parts.append(f"Shared entities: {', '.join(entity_types_shared)}")
+                    
+                    if keyword_overlap >= 0.3:
+                        reason_parts.append(f"Keyword overlap: {keyword_overlap:.2f}")
+                    
+                    reason = "; ".join(reason_parts) if reason_parts else "Entity-based derivation"
+                    
+                    relationship = MemoryRelationship(
+                        from_memory_id=new_memory.id,
+                        to_memory_id=existing_memory.id,
+                        relationship_type=RelationshipType.DERIVES,
+                        confidence=confidence,
+                        similarity_score=None,
+                        reason=reason
                     )
                     
-                    if not already_related:
-                        # Calculate a derived confidence based on keyword overlap
-                        keyword_overlap = len(common_keywords) / max(len(new_keywords), len(existing_keywords))
-                        
-                        if keyword_overlap >= 0.3:  # 30% keyword overlap
-                            relationship = MemoryRelationship(
-                                from_memory_id=new_memory.id,
-                                to_memory_id=existing_memory.id,
-                                relationship_type=RelationshipType.DERIVES,
-                                confidence=keyword_overlap,
-                                similarity_score=None,
-                                reason=f"Shared keywords: {', '.join(common_keywords)} (overlap: {keyword_overlap:.2f})"
-                            )
-                            
-                            self.graph_store.add_relationship(relationship)
-                            logger.debug(
-                                f"Created DERIVES relationship: {new_memory.id} -> {existing_memory.id} "
-                                f"(keywords: {common_keywords})"
-                            )
+                    self.graph_store.add_relationship(relationship)
+                    logger.debug(
+                        f"Created DERIVES relationship: {new_memory.id} -> {existing_memory.id} "
+                        f"(entity_sim: {entity_similarity:.2f}, keyword_overlap: {keyword_overlap:.2f})"
+                    )
     
     async def ingest_text(self, text: str, title: Optional[str] = None, source: Optional[str] = None) -> Document:
         """
