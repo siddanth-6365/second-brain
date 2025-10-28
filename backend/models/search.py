@@ -18,6 +18,7 @@ class SearchQuery(BaseModel):
     
     # Search options
     semantic_weight: float = Field(default=0.7, ge=0.0, le=1.0)  # Weight of semantic vs keyword search
+    similarity_threshold: float = Field(default=0.0, ge=0.0, le=1.0)  # Minimum similarity score
     include_inactive: bool = False  # Include expired/inactive memories
     only_latest: bool = True  # Only return latest versions of updated memories
     

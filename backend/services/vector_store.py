@@ -14,12 +14,43 @@ class VectorStore:
     """Manages vector storage and retrieval using Qdrant"""
     
     def __init__(self):
-        self.client = QdrantClient(
-            host=settings.qdrant_host,
-            port=settings.qdrant_port
-        )
+        self.client = None
         self.collection_name = settings.qdrant_collection_name
-        self._initialize_collection()
+        self._connect_with_retry()
+    
+    def _connect_with_retry(self, max_retries: int = 3, retry_delay: int = 2):
+        """Connect to Qdrant with retry logic"""
+        import time
+        
+        for attempt in range(max_retries):
+            try:
+                self.client = QdrantClient(
+                    host=settings.qdrant_host,
+                    port=settings.qdrant_port,
+                    timeout=10
+                )
+                # Test connection
+                self.client.get_collections()
+                logger.info(f"Successfully connected to Qdrant at {settings.qdrant_host}:{settings.qdrant_port}")
+                self._initialize_collection()
+                return
+            except Exception as e:
+                attempt_num = attempt + 1
+                if attempt_num < max_retries:
+                    logger.warning(
+                        f"Failed to connect to Qdrant (attempt {attempt_num}/{max_retries}). "
+                        f"Retrying in {retry_delay}s... Error: {e}"
+                    )
+                    time.sleep(retry_delay)
+                else:
+                    logger.error(
+                        f"Failed to connect to Qdrant after {max_retries} attempts. "
+                        f"Please ensure Qdrant is running at {settings.qdrant_host}:{settings.qdrant_port}"
+                    )
+                    raise ConnectionError(
+                        f"Cannot connect to Qdrant at {settings.qdrant_host}:{settings.qdrant_port}. "
+                        f"Make sure it's running with: docker compose up -d"
+                    ) from e
     
     def _initialize_collection(self):
         """Initialize the Qdrant collection if it doesn't exist"""

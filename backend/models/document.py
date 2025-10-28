@@ -1,7 +1,7 @@
 """Document model - represents raw input to the system"""
 
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel, Field
 import uuid
@@ -45,7 +45,7 @@ class Document(BaseModel):
     processed_at: Optional[datetime] = None
     
     # Relationships
-    memory_ids: list[str] = Field(default_factory=list)  # IDs of memories created from this document
+    memory_ids: List[str] = Field(default_factory=list)  # IDs of memories created from this document
     
     class Config:
         json_schema_extra = {
