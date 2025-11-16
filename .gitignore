@@ -25,9 +25,11 @@ wheels/
 venv/
 env/
 ENV/
+backend/.venv/
 
 # Environment Variables
 .env
+backend/.env
 
 # IDE
 .vscode/

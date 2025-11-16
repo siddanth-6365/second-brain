@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { ingestDocument } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { getEntityColor } from '@/lib/utils'
+import { ProtectedRoute } from '@/components/protected-route'
 
 export default function IngestPage() {
   const [content, setContent] = useState('')
@@ -118,7 +119,8 @@ export default function IngestPage() {
   const totalEntities = Object.values(entities).flat().length
 
   return (
-    <div className="space-y-8">
+    <ProtectedRoute>
+      <div className="space-y-8">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
@@ -313,6 +315,7 @@ export default function IngestPage() {
           </Card>
         </div>
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

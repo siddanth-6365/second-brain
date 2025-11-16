@@ -163,6 +163,12 @@ class MemoryTiering:
             "hot_percentage": (len(self.hot_memories) / total * 100) if total > 0 else 0,
             "cold_percentage": (len(self.cold_memories) / total * 100) if total > 0 else 0
         }
+    
+    def remove_memories(self, memory_ids: List[str]):
+        """Remove a batch of memories from both tiers"""
+        for memory_id in memory_ids:
+            self.hot_memories.pop(memory_id, None)
+            self.cold_memories.pop(memory_id, None)
 
 
 # Global instance

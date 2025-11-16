@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { searchMemories } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { formatRelativeTime, getEntityColor, getRelationshipColor, truncateText } from '@/lib/utils'
+import { ProtectedRoute } from '@/components/protected-route'
 
 interface SearchResult {
   id: string
@@ -92,7 +93,8 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <ProtectedRoute>
+      <div className="space-y-8">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
@@ -278,6 +280,7 @@ export default function SearchPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

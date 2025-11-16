@@ -1,9 +1,14 @@
 """Embedding service for converting text to vectors"""
 
-from typing import List
-from sentence_transformers import SentenceTransformer
-from backend.config import settings
+import os
 import logging
+from typing import List
+
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+from sentence_transformers import SentenceTransformer
+
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 

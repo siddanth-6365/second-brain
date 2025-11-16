@@ -124,7 +124,7 @@ class IngestionService:
         Returns:
             List of created memories
         """
-        logger.info(f"Processing document: {document.id}")
+        logger.info(f"Processing document: {document.id} for user {document.user_id}")
         
         try:
             # Update status: EXTRACTING
@@ -152,6 +152,7 @@ class IngestionService:
                     entities_list.extend(entity_set)
                 
                 memory = Memory(
+                    user_id=document.user_id,
                     content=chunk,
                     document_id=document.id,
                     chunk_index=idx,
@@ -217,7 +218,8 @@ class IngestionService:
         """
         logger.info(f"Detecting relationships for {len(new_memories)} new memories")
         
-        existing_memories = self.graph_store.get_all_memories()
+        user_id = new_memories[0].user_id if new_memories else None
+        existing_memories = self.graph_store.get_all_memories(user_id=user_id)
         
         for new_memory in new_memories:
             # Search for similar existing memories
@@ -227,7 +229,8 @@ class IngestionService:
             similar_results = self.vector_store.search(
                 query_vector=new_memory.embedding,
                 limit=5,
-                score_threshold=0.65  # Only consider somewhat similar memories
+                score_threshold=0.65,  # Only consider somewhat similar memories
+                user_id=new_memory.user_id,
             )
             
             for result in similar_results:
@@ -280,6 +283,7 @@ class IngestionService:
                 self.graph_store.mark_memory_outdated(existing_memory.id)
                 
                 return MemoryRelationship(
+                    user_id=new_memory.user_id,
                     from_memory_id=new_memory.id,
                     to_memory_id=existing_memory.id,
                     relationship_type=RelationshipType.UPDATES,
@@ -290,6 +294,7 @@ class IngestionService:
             else:
                 # Very similar but not contradictory = similar reference
                 return MemoryRelationship(
+                    user_id=new_memory.user_id,
                     from_memory_id=new_memory.id,
                     to_memory_id=existing_memory.id,
                     relationship_type=RelationshipType.SIMILAR,
@@ -301,6 +306,7 @@ class IngestionService:
         # Medium similarity = likely extends or adds context
         elif similarity_score >= settings.similarity_threshold_extend:
             return MemoryRelationship(
+                user_id=new_memory.user_id,
                 from_memory_id=new_memory.id,
                 to_memory_id=existing_memory.id,
                 relationship_type=RelationshipType.EXTENDS,
@@ -312,6 +318,7 @@ class IngestionService:
         # Lower similarity but still relevant = similar/related
         else:
             return MemoryRelationship(
+                user_id=new_memory.user_id,
                 from_memory_id=new_memory.id,
                 to_memory_id=existing_memory.id,
                 relationship_type=RelationshipType.SIMILAR,
@@ -359,7 +366,8 @@ class IngestionService:
         
         This is more accurate than keyword-only matching.
         """
-        all_memories = self.graph_store.get_all_memories()
+        user_id = new_memories[0].user_id if new_memories else None
+        all_memories = self.graph_store.get_all_memories(user_id=user_id)
         
         for new_memory in new_memories:
             # Extract entities from new memory
@@ -371,7 +379,11 @@ class IngestionService:
                     continue
                 
                 # Check if already related
-                existing_relationships = self.graph_store.get_relationships(new_memory.id, direction="both")
+                existing_relationships = self.graph_store.get_relationships(
+                    new_memory.id,
+                    direction="both",
+                    user_id=user_id,
+                )
                 already_related = any(
                     rel.to_memory_id == existing_memory.id or rel.from_memory_id == existing_memory.id
                     for rel in existing_relationships
@@ -427,6 +439,7 @@ class IngestionService:
                     reason = "; ".join(reason_parts) if reason_parts else "Entity-based derivation"
                     
                     relationship = MemoryRelationship(
+                        user_id=new_memory.user_id,
                         from_memory_id=new_memory.id,
                         to_memory_id=existing_memory.id,
                         relationship_type=RelationshipType.DERIVES,
@@ -441,7 +454,13 @@ class IngestionService:
                         f"(entity_sim: {entity_similarity:.2f}, keyword_overlap: {keyword_overlap:.2f})"
                     )
     
-    async def ingest_text(self, text: str, title: Optional[str] = None, source: Optional[str] = None) -> Document:
+    async def ingest_text(
+        self,
+        text: str,
+        title: Optional[str] = None,
+        source: Optional[str] = None,
+        user_id: Optional[str] = None
+    ) -> Document:
         """
         Convenience method to ingest text directly.
         
@@ -453,7 +472,11 @@ class IngestionService:
         Returns:
             Processed document
         """
+        if not user_id:
+            raise ValueError("user_id is required to ingest documents")
+
         document = Document(
+            user_id=user_id,
             content=text,
             title=title,
             source=source,

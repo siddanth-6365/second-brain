@@ -1,7 +1,14 @@
 """Configuration management for Second Brain"""
 
-from pydantic_settings import BaseSettings
+from pathlib import Path
 from typing import Optional
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+
+BASE_DIR = Path(__file__).resolve().parent
+ENV_PATH = BASE_DIR / ".env"
 
 
 class Settings(BaseSettings):
@@ -20,6 +27,13 @@ class Settings(BaseSettings):
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
     qdrant_collection_name: str = "memories"
+    qdrant_api_key: Optional[str] = Field(default=None, alias="QDRANT_API_KEY")
+    qdrant_url: Optional[str] = Field(default=None, alias="QDRANT_URL")  # Use for Qdrant Cloud (https://...)
+    qdrant_endpoint: Optional[str] = Field(default=None, alias="QDRANT_ENDPOINT")
+    qdrant_cluster_id: Optional[str] = Field(default=None, alias="QDRANT_CLUSTER_ID")
+    qdrant_use_https: bool = Field(default=False, alias="QDRANT_USE_HTTPS")
+    qdrant_timeout: int = 10
+    qdrant_relationship_collection_name: str = "memory_relationships"
     
     # Embedding Configuration
     embedding_model: str = "all-MiniLM-L6-v2"
@@ -41,6 +55,12 @@ class Settings(BaseSettings):
     # Time Decay Configuration
     time_decay_half_life_days: int = 90  # Days for score to decay to 50%
     
+    # Supabase Auth
+    supabase_url: Optional[str] = None
+    supabase_anon_key: Optional[str] = None
+    supabase_service_role_key: Optional[str] = None  # Optional, for admin tasks
+    supabase_jwt_secret: Optional[str] = None  # Optional, enables local JWT verification
+    
     # CORS Configuration
     allowed_origins: Optional[str] = None  # Comma-separated list of allowed origins
     
@@ -49,7 +69,7 @@ class Settings(BaseSettings):
     rate_limit_period: Optional[int] = None  # Period in seconds
     
     class Config:
-        env_file = ".env"
+        env_file = ENV_PATH
         case_sensitive = False
         extra = "ignore"  # Ignore extra fields from .env
 

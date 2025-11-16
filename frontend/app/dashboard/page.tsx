@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getGraphStats } from '@/lib/api'
 import { getRelationshipColor } from '@/lib/utils'
+import { ProtectedRoute } from '@/components/protected-route'
 
 interface GraphStats {
   total_memories: number
@@ -78,7 +79,8 @@ export default function DashboardPage() {
   const similarPercent = totalRelationships > 0 ? (relationshipTypes.similar / totalRelationships) * 100 : 0
 
   return (
-    <div className="space-y-8">
+    <ProtectedRoute>
+      <div className="space-y-8">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
@@ -428,6 +430,7 @@ export default function DashboardPage() {
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

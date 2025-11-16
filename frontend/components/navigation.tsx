@@ -5,9 +5,11 @@ import { usePathname } from 'next/navigation'
 import { Brain, Search, Network, MessageSquare, BarChart3, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/components/auth-provider'
 
 export function Navigation() {
   const pathname = usePathname()
+  const { user, signOut, loading } = useAuth()
 
   const routes = [
     {
@@ -51,7 +53,7 @@ export function Navigation() {
   return (
     <nav className="border-b border-white/10 bg-white/5 backdrop-blur-xl sticky top-0 z-50 shadow-lg">
       <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex h-16 items-center justify-between gap-4">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity group">
             <div className="relative">
@@ -83,26 +85,31 @@ export function Navigation() {
             })}
           </div>
 
-          {/* Mobile Menu Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden text-white"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </Button>
+          {/* Auth Actions */}
+          <div className="flex items-center gap-3">
+            {user ? (
+              <>
+                <div className="hidden md:flex flex-col text-right">
+                  <span className="text-xs text-white/50">Logged in as</span>
+                  <span className="text-sm font-medium text-white truncate max-w-[180px]">
+                    {user.email}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10"
+                  disabled={loading}
+                  onClick={() => signOut()}
+                >
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Button className="bg-blue-600 hover:bg-blue-700" asChild>
+                <Link href="/login">Login</Link>
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Mobile Menu */}

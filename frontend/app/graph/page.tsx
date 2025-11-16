@@ -11,6 +11,7 @@ import { exportGraph } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { formatRelativeTime, getRelationshipColor, truncateText } from '@/lib/utils'
 import dynamic from 'next/dynamic'
+import { ProtectedRoute } from '@/components/protected-route'
 
 // Dynamically import ForceGraph2D to avoid SSR issues
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false })
@@ -115,7 +116,8 @@ export default function GraphPage() {
   }, [])
 
   return (
-    <div className="space-y-8">
+    <ProtectedRoute>
+      <div className="space-y-8">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
@@ -418,6 +420,7 @@ export default function GraphPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

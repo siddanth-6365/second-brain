@@ -1,9 +1,17 @@
 """Main FastAPI application for Second Brain"""
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from pathlib import Path
+import sys
+
+CURRENT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = CURRENT_DIR.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional
 from datetime import datetime as dt
+from typing import List, Optional
 from pydantic import BaseModel
 
 from backend.config import settings
@@ -12,8 +20,10 @@ from backend.services import (
     get_ingestion_service,
     get_search_service,
     get_graph_store,
-    get_vector_store
+    get_vector_store,
+    get_memory_tiering,
 )
+from backend.services.auth_service import AuthenticatedUser, get_current_user
 
 import logging
 
@@ -78,7 +88,8 @@ async def health_check():
 @app.post("/documents/ingest", response_model=Document)
 async def ingest_document(
     request: dict,
-    background_tasks: BackgroundTasks = None
+    background_tasks: BackgroundTasks = None,
+    current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """
     Ingest a document and create memories.
@@ -126,7 +137,8 @@ async def ingest_document(
         document = await ingestion_service.ingest_text(
             text=content,
             title=title if title else None,
-            source=source if source else None
+            source=source if source else None,
+            user_id=current_user.id,
         )
         return document
     except HTTPException:
@@ -137,7 +149,12 @@ async def ingest_document(
 
 
 @app.get("/documents/{document_id}/memories", response_model=List[Memory])
-async def get_document_memories(document_id: str, skip: int = 0, limit: int = 50):
+async def get_document_memories(
+    document_id: str,
+    skip: int = 0,
+    limit: int = 50,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
     """
     Get memories created from a document with pagination.
     
@@ -153,7 +170,7 @@ async def get_document_memories(document_id: str, skip: int = 0, limit: int = 50
     
     graph_store = get_graph_store()
     memories = [
-        m for m in graph_store.get_all_memories()
+        m for m in graph_store.get_all_memories(user_id=current_user.id)
         if m.document_id == document_id
     ]
     
@@ -166,7 +183,10 @@ async def get_document_memories(document_id: str, skip: int = 0, limit: int = 50
 
 # Memory endpoints
 @app.post("/memories/search", response_model=List[SearchResult])
-async def search_memories(query: SearchQuery):
+async def search_memories(
+    query: SearchQuery,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
     """
     Search for memories using semantic and keyword search.
     
@@ -174,7 +194,7 @@ async def search_memories(query: SearchQuery):
     """
     try:
         search_service = get_search_service()
-        results = await search_service.search(query)
+        results = await search_service.search(query, user_id=current_user.id)
         return results
     except Exception as e:
         logger.error(f"Error searching memories: {e}")
@@ -182,10 +202,13 @@ async def search_memories(query: SearchQuery):
 
 
 @app.get("/memories/{memory_id}", response_model=Memory)
-async def get_memory(memory_id: str):
+async def get_memory(
+    memory_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
     """Get a specific memory by ID"""
     search_service = get_search_service()
-    memory = await search_service.get_memory_by_id(memory_id)
+    memory = await search_service.get_memory_by_id(memory_id, user_id=current_user.id)
     
     if not memory:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -194,45 +217,52 @@ async def get_memory(memory_id: str):
 
 
 @app.get("/memories/{memory_id}/related", response_model=List[Memory])
-async def get_related_memories(memory_id: str, max_depth: int = 2):
+async def get_related_memories(
+    memory_id: str,
+    max_depth: int = 2,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
     """Get memories related to a specific memory"""
     search_service = get_search_service()
     
     # First check if memory exists
-    memory = await search_service.get_memory_by_id(memory_id)
+    memory = await search_service.get_memory_by_id(memory_id, user_id=current_user.id)
     if not memory:
         raise HTTPException(status_code=404, detail="Memory not found")
     
     # Get related memories
-    related = await search_service.get_related_memories(memory_id, max_depth=max_depth)
+    related = await search_service.get_related_memories(memory_id, user_id=current_user.id, max_depth=max_depth)
     return related
 
 
 @app.get("/memories/timeline/{topic}", response_model=List[Memory])
-async def get_memory_timeline(topic: str):
+async def get_memory_timeline(
+    topic: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
     """Get timeline of memories about a topic, showing evolution of information"""
     search_service = get_search_service()
-    timeline = await search_service.get_memory_timeline(topic)
+    timeline = await search_service.get_memory_timeline(topic, user_id=current_user.id)
     return timeline
 
 
 # Graph endpoints
 @app.get("/graph/export")
-async def export_graph():
+async def export_graph(current_user: AuthenticatedUser = Depends(get_current_user)):
     """
     Export the entire knowledge graph for visualization.
     
     Returns nodes (memories) and edges (relationships).
     """
     graph_store = get_graph_store()
-    return graph_store.export_graph()
+    return graph_store.export_graph(user_id=current_user.id)
 
 
 @app.get("/graph/stats")
-async def get_graph_stats():
+async def get_graph_stats(current_user: AuthenticatedUser = Depends(get_current_user)):
     """Get statistics about the knowledge graph"""
     graph_store = get_graph_store()
-    return graph_store.get_graph_stats()
+    return graph_store.get_graph_stats(user_id=current_user.id)
 
 
 # Chat endpoint models
@@ -263,7 +293,10 @@ class ChatResponse(BaseModel):
 
 # Chat endpoint
 @app.post("/chat", response_model=ChatResponse)
-async def chat_with_memories(request: ChatRequest):
+async def chat_with_memories(
+    request: ChatRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
     """
     Chat with your memories using Groq LLM.
     
@@ -295,7 +328,7 @@ async def chat_with_memories(request: ChatRequest):
             only_latest=True
         )
         
-        search_results = await search_service.search(search_query)
+        search_results = await search_service.search(search_query, user_id=current_user.id)
         
         if not search_results:
             return ChatResponse(
@@ -367,7 +400,7 @@ Please provide a helpful answer based on the memories above."""
 
 # Admin endpoints
 @app.delete("/admin/clear-all")
-async def clear_all_data():
+async def clear_all_data(current_user: AuthenticatedUser = Depends(get_current_user)):
     """
     ⚠️ DANGER: Clear all memories and relationships from the system.
     
@@ -381,25 +414,22 @@ async def clear_all_data():
     try:
         vector_store = get_vector_store()
         graph_store = get_graph_store()
+        memory_tiering = get_memory_tiering()
         
-        # Delete the Qdrant collection and recreate it
-        vector_store.client.delete_collection(
-            collection_name=settings.qdrant_collection_name
-        )
+        # Delete vector embeddings for this user
+        vector_store.delete_memories_by_user(current_user.id)
         
-        # Reinitialize the collection
-        vector_store._initialize_collection()
+        # Remove graph data for this user
+        removal_stats = graph_store.clear_user_data(current_user.id)
+        memory_tiering.remove_memories(removal_stats.get("memory_ids", []))
         
-        # Clear the graph store by creating a new instance
-        graph_store.graph.clear()
-        graph_store.memories.clear()
-        graph_store.relationships.clear()
-        
-        logger.info("All data cleared successfully")
+        logger.info("Cleared data for user %s", current_user.id)
         
         return {
             "status": "success",
-            "message": "All memories and relationships have been cleared",
+            "message": "All of your memories and relationships have been cleared",
+            "memories_deleted": removal_stats.get("memories", 0),
+            "relationships_deleted": removal_stats.get("relationships", 0),
             "timestamp": dt.utcnow().isoformat()
         }
         

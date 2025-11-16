@@ -23,7 +23,7 @@ class SearchService:
         self.graph_store = get_graph_store()
         self.memory_tiering = get_memory_tiering()
     
-    async def search(self, query: SearchQuery) -> List[SearchResult]:
+    async def search(self, query: SearchQuery, user_id: str) -> List[SearchResult]:
         """
         Search for memories using semantic and keyword search.
         
@@ -44,7 +44,8 @@ class SearchService:
         vector_results = self.vector_store.search(
             query_vector=query_embedding,
             limit=query.limit * 2,  # Get more results for filtering
-            score_threshold=None  # No threshold, we'll filter manually
+            score_threshold=None,  # No threshold, we'll filter manually
+            user_id=user_id,
         )
         logger.info(f"Vector store returned {len(vector_results)} results")
         
@@ -56,12 +57,12 @@ class SearchService:
             payload = result["payload"]
             
             # Get full memory from graph store, or reconstruct from payload
-            memory = self.graph_store.get_memory(memory_id)
+            memory = self.graph_store.get_memory(memory_id, user_id=user_id)
             if not memory:
                 # Reconstruct memory from vector store payload
                 try:
-                    from datetime import datetime
                     memory = Memory(
+                        user_id=payload.get("user_id"),
                         id=memory_id,
                         content=payload.get("content", ""),
                         summary=payload.get("summary", ""),
@@ -79,6 +80,9 @@ class SearchService:
                 except Exception as e:
                     logger.warning(f"Failed to reconstruct memory {memory_id} from payload: {e}")
                     continue
+            
+            if memory.user_id != user_id:
+                continue
             
             # Apply filters
             if query.only_latest and not memory.is_latest:
@@ -123,7 +127,8 @@ class SearchService:
             # Get related memories
             related_memories = self.graph_store.get_related_memories(
                 memory_id,
-                max_depth=1
+                max_depth=1,
+                user_id=user_id,
             )
             related_ids = [m.id for m in related_memories[:5]]  # Top 5 related
             
@@ -194,7 +199,7 @@ class SearchService:
         
         return "; ".join(explanations)
     
-    async def get_memory_by_id(self, memory_id: str) -> Optional[Memory]:
+    async def get_memory_by_id(self, memory_id: str, user_id: str) -> Optional[Memory]:
         """
         Get a specific memory by ID.
         
@@ -204,13 +209,13 @@ class SearchService:
         Returns:
             Memory or None if not found
         """
-        memory = self.graph_store.get_memory(memory_id)
+        memory = self.graph_store.get_memory(memory_id, user_id=user_id)
         if memory:
             memory.accessed_at = datetime.utcnow()
             memory.access_count += 1
         return memory
     
-    async def get_related_memories(self, memory_id: str, max_depth: int = 2) -> List[Memory]:
+    async def get_related_memories(self, memory_id: str, user_id: str, max_depth: int = 2) -> List[Memory]:
         """
         Get memories related to a specific memory.
         
@@ -221,9 +226,9 @@ class SearchService:
         Returns:
             List of related memories
         """
-        return self.graph_store.get_related_memories(memory_id, max_depth=max_depth)
+        return self.graph_store.get_related_memories(memory_id, max_depth=max_depth, user_id=user_id)
     
-    async def get_memory_timeline(self, topic: str) -> List[Memory]:
+    async def get_memory_timeline(self, topic: str, user_id: str) -> List[Memory]:
         """
         Get timeline of memories about a topic, showing how information evolved.
         
@@ -235,7 +240,7 @@ class SearchService:
         """
         # Search for relevant memories
         query = SearchQuery(query=topic, limit=50, only_latest=False)
-        results = await self.search(query)
+        results = await self.search(query, user_id=user_id)
         
         # Extract memories and sort by time
         memories = [r.memory for r in results]

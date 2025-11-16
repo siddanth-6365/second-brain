@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { useRouter } from 'next/navigation'
 import { getGraphStats, exportGraph } from '@/lib/api'
 import dynamic from 'next/dynamic'
+import { ProtectedRoute } from '@/components/protected-route'
 
 // Dynamically import ForceGraph2D to avoid SSR issues
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false })
@@ -55,7 +56,8 @@ export default function Home() {
   }
 
   return (
-    <div className="space-y-12">
+    <ProtectedRoute>
+      <div className="space-y-12">
       {/* Hero Section */}
       <div className="text-center space-y-6 py-12">
         <div className="flex justify-center">
@@ -235,6 +237,7 @@ export default function Home() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

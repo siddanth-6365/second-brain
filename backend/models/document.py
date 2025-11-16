@@ -26,9 +26,13 @@ class Document(BaseModel):
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     
+    # Ownership
+    user_id: Optional[str] = Field(default=None, description="Supabase user id for document owner")
+    
     # Content
     content: str
     title: Optional[str] = None
+    description: Optional[str] = None
     source: Optional[str] = None  # URL, file path, or source identifier
     
     # Metadata
@@ -52,6 +56,7 @@ class Document(BaseModel):
             "example": {
                 "content": "Dhravya is the founder of Supermemory, an AI-focused company.",
                 "title": "About Supermemory",
+                "description": "Quick summary pulled from product site",
                 "source": "notes.txt",
                 "document_type": "text"
             }

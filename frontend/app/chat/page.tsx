@@ -11,6 +11,10 @@ import { chat } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { formatRelativeTime, truncateText } from '@/lib/utils'
 import { useSearchParams } from 'next/navigation'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import type { Components } from 'react-markdown'
+import { ProtectedRoute } from '@/components/protected-route'
 
 interface Message {
   id: string
@@ -23,6 +27,54 @@ interface Message {
     created_at: string
   }>
   timestamp: Date
+}
+
+const markdownComponents: Components = {
+  table: ({ node, ...props }) => (
+    <div className="overflow-x-auto rounded-lg border border-white/10">
+      <table
+        {...props}
+        className="w-full border-collapse text-sm text-white/90 [&_th]:font-semibold"
+      />
+    </div>
+  ),
+  th: ({ node, ...props }) => (
+    <th
+      {...props}
+      className="border border-white/10 bg-white/10 px-3 py-2 text-left text-white"
+    />
+  ),
+  td: ({ node, ...props }) => (
+    <td
+      {...props}
+      className="border border-white/10 px-3 py-2 align-top text-white/90"
+    />
+  ),
+  a: ({ node, ...props }) => (
+    <a
+      {...props}
+      className="text-blue-300 underline hover:text-blue-200 break-words"
+      target="_blank"
+      rel="noreferrer"
+    />
+  ),
+  ul: ({ node, ordered, ...props }) => (
+    <ul {...props} className="list-disc list-inside space-y-1 text-white/90" />
+  ),
+  ol: ({ node, ordered, ...props }) => (
+    <ol {...props} className="list-decimal list-inside space-y-1 text-white/90" />
+  ),
+  li: ({ node, ordered, ...props }) => <li {...props} className="leading-relaxed" />,
+  p: ({ node, ...props }) => <p {...props} className="leading-relaxed text-white/90" />,
+  code: ({ node, inline, ...props }) =>
+    inline ? (
+      <code {...props} className="rounded bg-white/10 px-1 py-0.5 text-sm" />
+    ) : (
+      <code
+        {...props}
+        className="block rounded bg-black/40 p-3 text-sm text-white/90 overflow-x-auto"
+      />
+    ),
 }
 
 export default function ChatPage() {
@@ -102,7 +154,8 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="space-y-6 h-[calc(100vh-200px)] flex flex-col">
+    <ProtectedRoute>
+      <div className="space-y-6 h-[calc(100vh-200px)] flex flex-col">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
@@ -136,8 +189,18 @@ export default function ChatPage() {
                       : 'bg-white/10 border-white/20'
                   }`}
                 >
-                  <CardContent className="pt-4">
-                    <p className="text-white/90 whitespace-pre-wrap">{message.content}</p>
+                  <CardContent className="pt-4 space-y-4">
+                    {message.role === 'assistant' ? (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={markdownComponents}
+                        className="space-y-3 text-sm text-white/90"
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    ) : (
+                      <p className="text-white/90 whitespace-pre-wrap">{message.content}</p>
+                    )}
                     <div className="flex items-center justify-between mt-3">
                       <span className="text-xs text-white/50">
                         {message.timestamp.toLocaleTimeString()}
@@ -218,6 +281,7 @@ export default function ChatPage() {
           )}
         </Button>
       </form>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

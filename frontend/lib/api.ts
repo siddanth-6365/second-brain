@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { supabase } from './supabase-client'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -8,6 +9,20 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+})
+
+api.interceptors.request.use(async (config) => {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (token) {
+      config.headers = config.headers ?? {}
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  } catch (error) {
+    console.warn('Failed to attach Supabase token', error)
+  }
+  return config
 })
 
 // Health & Stats

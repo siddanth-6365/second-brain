@@ -21,6 +21,9 @@ class MemoryRelationship(BaseModel):
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     
+    # Ownership
+    user_id: Optional[str] = Field(default=None, description="Supabase user id for both memories")
+    
     # Relationship
     from_memory_id: str
     to_memory_id: str
@@ -56,6 +59,9 @@ class Memory(BaseModel):
     """
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    
+    # Ownership
+    user_id: Optional[str] = Field(default=None, description="Supabase user id for memory owner")
     
     # Content
     content: str

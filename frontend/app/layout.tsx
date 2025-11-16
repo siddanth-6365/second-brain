@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
 import { Navigation } from '@/components/navigation'
+import { Providers } from '@/components/providers'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,13 +25,15 @@ export default function RootLayout({
         <div className="bg-orb-2" />
         <div className="bg-orb-3" />
         
-        <div className="min-h-screen relative z-10">
-          <Navigation />
-          <main className="container mx-auto px-4 py-8">
-            {children}
-          </main>
-          <Toaster />
-        </div>
+        <Providers>
+          <div className="min-h-screen relative z-10">
+            <Navigation />
+            <main className="container mx-auto px-4 py-8">
+              {children}
+            </main>
+            <Toaster />
+          </div>
+        </Providers>
       </body>
     </html>
   )
