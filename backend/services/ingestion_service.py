@@ -3,13 +3,19 @@
 from typing import List, Optional
 from datetime import datetime
 import re
+from fastapi import UploadFile
 from backend.models import Document, Memory, MemoryRelationship, RelationshipType, DocumentStatus
 from backend.services.embedding_service import get_embedding_service
 from backend.services.vector_store import get_vector_store
 from backend.services.graph_store import get_graph_store
 from backend.services.memory_tiering import get_memory_tiering
 from backend.services.entity_service import get_entity_service
+from backend.services.content_loader import get_content_loader
 from backend.config import settings
+from backend.services.summarization_service import (
+    get_summarization_service,
+    SummarizationError,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,6 +30,8 @@ class IngestionService:
         self.graph_store = get_graph_store()
         self.memory_tiering = get_memory_tiering()
         self.entity_service = get_entity_service()
+        self.content_loader = get_content_loader()
+        self.summarizer = get_summarization_service()
     
     def chunk_text(self, text: str, chunk_size: int = None, overlap: int = None) -> List[str]:
         """
@@ -260,6 +268,11 @@ class IngestionService:
         # Implement basic DERIVES relationships using pattern detection
         await self._detect_derives_relationships(new_memories)
     
+    def _clamp_confidence(self, value: Optional[float]) -> Optional[float]:
+        if value is None:
+            return None
+        return max(0.0, min(1.0, float(value)))
+
     def _classify_relationship(
         self, 
         new_memory: Memory, 
@@ -287,7 +300,7 @@ class IngestionService:
                     from_memory_id=new_memory.id,
                     to_memory_id=existing_memory.id,
                     relationship_type=RelationshipType.UPDATES,
-                    confidence=similarity_score,
+                    confidence=self._clamp_confidence(similarity_score),
                     similarity_score=similarity_score,
                     reason=f"New information updates/contradicts existing (similarity: {similarity_score:.2f})"
                 )
@@ -298,7 +311,7 @@ class IngestionService:
                     from_memory_id=new_memory.id,
                     to_memory_id=existing_memory.id,
                     relationship_type=RelationshipType.SIMILAR,
-                    confidence=similarity_score,
+                    confidence=self._clamp_confidence(similarity_score),
                     similarity_score=similarity_score,
                     reason=f"Highly similar content (similarity: {similarity_score:.2f})"
                 )
@@ -310,7 +323,7 @@ class IngestionService:
                 from_memory_id=new_memory.id,
                 to_memory_id=existing_memory.id,
                 relationship_type=RelationshipType.EXTENDS,
-                confidence=similarity_score,
+                confidence=self._clamp_confidence(similarity_score),
                 similarity_score=similarity_score,
                 reason=f"Additional context for related topic (similarity: {similarity_score:.2f})"
             )
@@ -322,7 +335,7 @@ class IngestionService:
                 from_memory_id=new_memory.id,
                 to_memory_id=existing_memory.id,
                 relationship_type=RelationshipType.SIMILAR,
-                confidence=similarity_score,
+                confidence=self._clamp_confidence(similarity_score),
                 similarity_score=similarity_score,
                 reason=f"Related content (similarity: {similarity_score:.2f})"
             )
@@ -443,7 +456,7 @@ class IngestionService:
                         from_memory_id=new_memory.id,
                         to_memory_id=existing_memory.id,
                         relationship_type=RelationshipType.DERIVES,
-                        confidence=confidence,
+                        confidence=self._clamp_confidence(confidence),
                         similarity_score=None,
                         reason=reason
                     )
@@ -454,37 +467,107 @@ class IngestionService:
                         f"(entity_sim: {entity_similarity:.2f}, keyword_overlap: {keyword_overlap:.2f})"
                     )
     
-    async def ingest_text(
+    async def ingest_entry(
         self,
-        text: str,
-        title: Optional[str] = None,
-        source: Optional[str] = None,
-        user_id: Optional[str] = None
+        *,
+        user_id: str,
+        entry_type: str,
+        title: Optional[str],
+        description: Optional[str],
+        note_content: Optional[str],
+        link_url: Optional[str],
+        upload_file: Optional[UploadFile],
+        explicit_source: Optional[str] = None,
     ) -> Document:
-        """
-        Convenience method to ingest text directly.
-        
-        Args:
-            text: Text content
-            title: Optional title
-            source: Optional source identifier
-            
-        Returns:
-            Processed document
-        """
-        if not user_id:
-            raise ValueError("user_id is required to ingest documents")
+        """Normalize note/link/file submissions into a document."""
+        entry_type = (entry_type or "note").lower()
+        metadata = {
+            "ingest_type": entry_type,
+            "description": description or "",
+        }
+
+        summary_text: Optional[str] = None
+        summary_warning: Optional[str] = None
+        original_text: Optional[str] = None
+
+        if entry_type == "note":
+            if not note_content or not note_content.strip():
+                raise ValueError("Content is required when type=note")
+            text = note_content.strip()
+            original_text = text
+            source = explicit_source or "user_note"
+        elif entry_type == "link":
+            if not link_url:
+                raise ValueError("URL is required when type=link")
+            text, link_metadata = await self.content_loader.fetch_link(link_url)
+            metadata.update(link_metadata)
+            original_text = text
+            source = explicit_source or link_url
+            if self.summarizer:
+                try:
+                    summary_text = await self.summarizer.summarize(text)
+                except SummarizationError as exc:
+                    summary_warning = str(exc)
+        elif entry_type in {"file", "upload"}:
+            if upload_file is None:
+                raise ValueError("File is required when type=file")
+            text, file_metadata = await self.content_loader.extract_file(upload_file)
+            metadata.update(file_metadata)
+            original_text = text
+            source = explicit_source or file_metadata.get("file_name")
+            entry_type = "file"
+        else:
+            raise ValueError(f"Unsupported ingest type '{entry_type}'")
+
+        original_text = original_text or text
+        if summary_text:
+            metadata["link_summary"] = summary_text
+            metadata["original_excerpt"] = (original_text or "")[:1500]
+            text = summary_text.strip()
+        elif summary_warning:
+            metadata["summary_warning"] = summary_warning
+
+        text = (text or "").strip()
+        if entry_type == "link" and len(text) < 10:
+            text = (original_text or "")[:1000] or f"Link reference: {link_url}"
+        if len(text) < 10:
+            raise ValueError("Content too short. Please provide at least 10 characters.")
+        if len(text) > 1_000_000:
+            raise ValueError("Content too large. Maximum size is 1MB of text.")
 
         document = Document(
             user_id=user_id,
             content=text,
             title=title,
+            description=summary_text or description or summary_warning,
             source=source,
-            document_type="text"
+            document_type=entry_type,
+            metadata=metadata,
         )
-        
+
         await self.process_document(document)
         return document
+
+    async def ingest_text(
+        self,
+        text: str,
+        title: Optional[str] = None,
+        source: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> Document:
+        """Convenience wrapper for ingesting raw text."""
+        if not user_id:
+            raise ValueError("user_id is required to ingest documents")
+        return await self.ingest_entry(
+            user_id=user_id,
+            entry_type="note",
+            title=title,
+            description=None,
+            note_content=text,
+            link_url=None,
+            upload_file=None,
+            explicit_source=source,
+        )
 
 
 # Global instance

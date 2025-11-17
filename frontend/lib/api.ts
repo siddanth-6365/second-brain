@@ -42,11 +42,26 @@ export const exportGraph = async () => {
 }
 
 // Document Operations
-export const ingestDocument = async (content: string, title?: string, source?: string) => {
-  const response = await api.post('/documents/ingest', {
-    content,
-    title: title || undefined,
-    source: source || undefined,
+export type IngestMemoryPayload = {
+  type: 'note' | 'link' | 'file'
+  title?: string
+  description?: string
+  content?: string
+  url?: string
+  file?: File | null
+}
+
+export const ingestDocument = async (payload: IngestMemoryPayload) => {
+  const formData = new FormData()
+  formData.append('type', payload.type)
+  if (payload.title) formData.append('title', payload.title)
+  if (payload.description) formData.append('description', payload.description)
+  if (payload.type === 'note' && payload.content) formData.append('content', payload.content)
+  if (payload.type === 'link' && payload.url) formData.append('url', payload.url)
+  if (payload.type === 'file' && payload.file) formData.append('file', payload.file)
+
+  const response = await api.post('/documents/ingest', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   })
   return response.data
 }

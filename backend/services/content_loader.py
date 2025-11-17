@@ -23,6 +23,13 @@ class ContentLoader:
 
     def __init__(self, timeout: float = 15.0):
         self.timeout = timeout
+        self.default_headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/605.1.15 "
+                "(KHTML, like Gecko) Version/16.5 Safari/605.1.15"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
 
     async def fetch_link(self, url: str) -> Tuple[str, Dict[str, str]]:
         """Download a URL and convert HTML to plaintext."""
@@ -30,11 +37,32 @@ class ContentLoader:
             raise ValueError("URL is required for link ingestion")
 
         logger.info("Fetching link content: %s", url)
-        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            html = response.text
+        try:
+            async with httpx.AsyncClient(
+                timeout=self.timeout,
+                follow_redirects=True,
+                headers=self.default_headers,
+            ) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                html = response.text
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            logger.warning("Failed to fetch URL %s (status=%s): %s", url, status, exc)
 
+            if status in (401, 403):
+                warning = "Access denied by the destination site"
+            else:
+                warning = f"HTTP {status}"
+
+            metadata = {
+                "source_url": url,
+                "content_type": "link",
+                "link_fetch_warning": warning,
+            }
+            return "", metadata
+
+        fetch_warning = ""
         soup = BeautifulSoup(html, "html.parser")
 
         # Remove scripts/styles to reduce noise
@@ -50,14 +78,12 @@ class ContentLoader:
         text = soup.get_text(separator="\n")
         text = "\n".join(line.strip() for line in text.splitlines() if line.strip())
 
-        if not text:
-            raise ValueError("Unable to extract textual content from the provided URL")
-
         metadata = {
             "source_url": url,
             "link_title": title or "",
             "link_description": meta_description,
             "content_type": "link",
+            "link_fetch_warning": fetch_warning,
         }
         return text, metadata
 

@@ -8,10 +8,10 @@ REPO_ROOT = CURRENT_DIR.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime as dt
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel
 
 from backend.config import settings
@@ -87,60 +87,46 @@ async def health_check():
 # Document endpoints
 @app.post("/documents/ingest", response_model=Document)
 async def ingest_document(
-    request: dict,
+    request: Request,
     background_tasks: BackgroundTasks = None,
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """
-    Ingest a document and create memories.
-    
-    The document will be chunked, embedded, and indexed into the knowledge graph.
+    Ingest a document (note, link, or file) and create memories.
     """
     try:
-        content = request.get("content", "").strip()
-        title = request.get("title", "").strip()
-        source = request.get("source", "").strip()
-        
-        # Validation
-        if not content:
-            raise HTTPException(status_code=400, detail="Content is required")
-        
-        # Max content size: 1MB
-        if len(content) > 1_000_000:
-            raise HTTPException(
-                status_code=413,
-                detail="Content too large. Maximum size is 1MB"
-            )
-        
-        # Min content size: 10 characters
-        if len(content) < 10:
-            raise HTTPException(
-                status_code=400,
-                detail="Content too short. Minimum 10 characters required"
-            )
-        
-        # Validate title length
+        payload, upload_file = await _parse_ingest_request(request)
+
+        def _clean(value: Optional[str]) -> Optional[str]:
+            if isinstance(value, str):
+                value = value.strip()
+                return value or None
+            return value
+
+        doc_type = (payload.get("type") or payload.get("doc_type") or "note").lower()
+        title = _clean(payload.get("title") or payload.get("name"))
+        description = _clean(payload.get("description") or payload.get("summary"))
+        note_content = payload.get("content") or payload.get("text")
+        link_url = _clean(payload.get("url") or payload.get("link"))
+        source_override = _clean(payload.get("source"))
+
         if title and len(title) > 500:
-            raise HTTPException(
-                status_code=400,
-                detail="Title too long. Maximum 500 characters"
-            )
-        
-        # Validate source length
-        if source and len(source) > 500:
-            raise HTTPException(
-                status_code=400,
-                detail="Source too long. Maximum 500 characters"
-            )
-        
+            raise HTTPException(status_code=400, detail="Title too long. Maximum 500 characters")
+
         ingestion_service = get_ingestion_service()
-        document = await ingestion_service.ingest_text(
-            text=content,
-            title=title if title else None,
-            source=source if source else None,
+        document = await ingestion_service.ingest_entry(
             user_id=current_user.id,
+            entry_type=doc_type,
+            title=title,
+            description=description,
+            note_content=note_content,
+            link_url=link_url,
+            upload_file=upload_file,
+            explicit_source=source_override,
         )
         return document
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except HTTPException:
         raise
     except Exception as e:
@@ -263,6 +249,31 @@ async def get_graph_stats(current_user: AuthenticatedUser = Depends(get_current_
     """Get statistics about the knowledge graph"""
     graph_store = get_graph_store()
     return graph_store.get_graph_stats(user_id=current_user.id)
+
+
+async def _parse_ingest_request(request: Request) -> Tuple[Dict[str, Any], Optional[UploadFile]]:
+    """Support both JSON and multipart ingestion payloads."""
+    content_type = (request.headers.get("content-type") or "").lower()
+    upload_file: Optional[UploadFile] = None
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        payload: Dict[str, Any] = {}
+        for key, value in form.multi_items():
+            if isinstance(value, UploadFile):
+                upload_file = value
+            else:
+                payload[key] = value
+        return payload, upload_file
+
+    try:
+        data = await request.json()
+        if isinstance(data, dict):
+            return data, None
+    except Exception:
+        pass
+
+    return {}, None
 
 
 # Chat endpoint models

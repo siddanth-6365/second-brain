@@ -23,6 +23,12 @@ interface GraphNode {
   created_at: string
   entities?: Record<string, string[]>
   color?: string
+  metadata?: Record<string, any>
+  tooltip?: string
+  x?: number
+  y?: number
+  fx?: number
+  fy?: number
 }
 
 interface GraphLink {
@@ -44,6 +50,7 @@ export default function GraphPage() {
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
   const [relationshipFilter, setRelationshipFilter] = useState('all')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -56,19 +63,25 @@ export default function GraphPage() {
       const data = await exportGraph()
       
       // Transform data for force graph
-      const nodes: GraphNode[] = data.nodes?.map((node: any) => {
-        // Use full_content from backend (or fallback to label or empty string)
-        const content = node.full_content || node.content || node.label || ''
-        const words = content.split(/\s+/).filter((w: string) => w.length > 3)
-        const mainWord = words.length > 0 ? words[0] : 'Memory'
+      const nodes: GraphNode[] = data.nodes?.map((node: any, index: number) => {
+        const content = node.full_content || node.content || node.label || 'Memory'
+        const name = truncateText(node.label || content, 80)
+        
+        // Pre-position nodes in a circle to avoid initial chaos
+        const angle = (index / (data.nodes?.length || 1)) * 2 * Math.PI
+        const radius = 200
         
         return {
           id: node.id,
-          name: mainWord,
-          content: content, // Full content for dialog
+          name: name || 'Memory',
+          content,
           created_at: node.created_at || new Date().toISOString(),
           entities: node.entities || {},
-          color: getNodeColor(node)
+          color: getNodeColor(node),
+          metadata: node.metadata || {},
+          tooltip: truncateText(content, 120),
+          x: Math.cos(angle) * radius,
+          y: Math.sin(angle) * radius,
         }
       }) || []
 
@@ -110,10 +123,21 @@ export default function GraphPage() {
     ? graphData.links 
     : graphData.links.filter(link => link.type === relationshipFilter)
 
-  const handleNodeClick = useCallback((node: any) => {
-    setSelectedNode(node)
-    setDialogOpen(true)
-  }, [])
+  const mapCanvasNode = useCallback(
+    (node: any) => graphData.nodes.find((n) => n.id === node?.id) || null,
+    [graphData],
+  )
+
+  const handleNodeClick = useCallback(
+    (node: any) => {
+      const detailed = mapCanvasNode(node)
+      if (detailed) {
+        setSelectedNode(detailed)
+        setDialogOpen(true)
+      }
+    },
+    [mapCanvasNode],
+  )
 
   return (
     <ProtectedRoute>
@@ -252,28 +276,68 @@ export default function GraphPage() {
               </Button>
             </div>
           ) : (
-            <div className="h-[600px] w-full bg-gray-900 rounded-lg overflow-hidden">
+            <div
+              className="h-[600px] w-full bg-gray-900 rounded-lg overflow-hidden relative"
+              style={{ cursor: hoveredNode ? 'pointer' : 'grab' }}
+            >
               <ForceGraph2D
                 graphData={{ 
                   nodes: graphData.nodes, 
                   links: filteredLinks 
                 }}
-                nodeLabel="name"
+                nodeLabel={(node: any) => {
+                  const detailed = mapCanvasNode(node)
+                  if (!detailed) return 'Memory'
+                  return `${detailed.name}\n\nClick to view details`
+                }}
                 nodeColor={(node: any) => node.color}
-                nodeRelSize={6}
+                nodeRelSize={8}
+                nodeVal={(node: any) => 10}
                 linkColor={(link: any) => getLinkColor(link as GraphLink)}
-                linkWidth={(link: any) => (link as GraphLink).confidence * 3}
+                linkWidth={(link: any) => Math.max((link as GraphLink).confidence * 3, 1)}
                 linkDirectionalParticles={2}
                 linkDirectionalParticleWidth={2}
+                linkDirectionalArrowLength={3.5}
+                linkDirectionalArrowRelPos={1}
                 onNodeClick={handleNodeClick}
+                onNodeHover={(node: any) => setHoveredNode(mapCanvasNode(node))}
+                onNodeDragEnd={(node: any) => {
+                  node.fx = node.x
+                  node.fy = node.y
+                }}
                 backgroundColor="#111827"
-                nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-                  const nodeRadius = 8
-                  
-                  // Draw outer glow
+                enableNodeDrag={true}
+                enableZoomInteraction={true}
+                enablePanInteraction={true}
+                cooldownTime={5000}
+                cooldownTicks={100}
+                onEngineStop={() => {
+                  // Fix all nodes in place after simulation stops
+                  graphData.nodes.forEach((node: any) => {
+                    if (!node.fx && !node.fy) {
+                      node.fx = node.x
+                      node.fy = node.y
+                    }
+                  })
+                }}
+                d3AlphaDecay={0.05}
+                d3VelocityDecay={0.4}
+                warmupTicks={50}
+                nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
+                  // Larger clickable area
+                  ctx.fillStyle = color
                   ctx.beginPath()
-                  ctx.arc(node.x, node.y, nodeRadius + 2, 0, 2 * Math.PI, false)
-                  ctx.fillStyle = node.color + '40'
+                  ctx.arc(node.x, node.y, 15, 0, 2 * Math.PI, false)
+                  ctx.fill()
+                }}
+                nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+                  const nodeRadius = 10
+                  const isHovered = hoveredNode?.id === node.id
+                  
+                  // Draw outer glow (bigger if hovered)
+                  ctx.beginPath()
+                  ctx.arc(node.x, node.y, nodeRadius + (isHovered ? 4 : 2), 0, 2 * Math.PI, false)
+                  ctx.fillStyle = node.color + (isHovered ? '60' : '40')
                   ctx.fill()
                   
                   // Draw node circle
@@ -282,10 +346,21 @@ export default function GraphPage() {
                   ctx.fillStyle = node.color
                   ctx.fill()
                   
-                  // Draw border
-                  ctx.strokeStyle = '#ffffff'
-                  ctx.lineWidth = 1.5
+                  // Draw border (thicker if hovered)
+                  ctx.strokeStyle = isHovered ? '#fbbf24' : '#ffffff'
+                  ctx.lineWidth = isHovered ? 2.5 : 1.5
                   ctx.stroke()
+                  
+                  // Draw label if zoomed in enough
+                  if (globalScale >= 1.5) {
+                    const label = node.name || 'Memory'
+                    const fontSize = 12 / globalScale
+                    ctx.font = `${fontSize}px Sans-Serif`
+                    ctx.textAlign = 'center'
+                    ctx.textBaseline = 'middle'
+                    ctx.fillStyle = '#ffffff'
+                    ctx.fillText(label.substring(0, 30), node.x, node.y + nodeRadius + 8)
+                  }
                 }}
               />
             </div>
@@ -319,13 +394,47 @@ export default function GraphPage() {
                 </div>
               </div>
 
+              {selectedNode.metadata?.link_summary && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-white/80">LLM Summary</p>
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-white/90 leading-relaxed whitespace-pre-wrap">
+                    {selectedNode.metadata.link_summary}
+                  </div>
+                </div>
+              )}
+
+              {selectedNode.metadata?.original_excerpt && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-white/80">Original Excerpt</p>
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                    <p className="text-white/70 leading-relaxed">
+                      {selectedNode.metadata.original_excerpt}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {selectedNode.metadata?.source_url && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-white/80">Source</p>
+                  <a
+                    href={selectedNode.metadata.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-300 underline break-all"
+                  >
+                    {selectedNode.metadata.source_url}
+                  </a>
+                </div>
+              )}
+
               {/* Entities */}
               {selectedNode.entities && Object.values(selectedNode.entities).flat().length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-semibold text-white/80">Extracted Entities</p>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(selectedNode.entities).map(([type, entities]) =>
-                      entities.map(entity => (
+                      Array.isArray(entities) && entities.map((entity: string) => (
                         <Badge 
                           key={`${type}-${entity}`} 
                           className="bg-blue-500/30 text-blue-300 border-blue-400/50"

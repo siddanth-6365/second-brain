@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # API Keys (optional for advanced features)
     openai_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
+    summary_model: Optional[str] = "llama-3.1-8b-instant"
     
     # Qdrant Vector Database
     qdrant_host: str = "localhost"

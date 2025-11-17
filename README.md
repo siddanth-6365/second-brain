@@ -38,6 +38,37 @@ python visualize_graph.py
 - **Persistent Storage**: Keep vectors locally via bind-mounted storage or point to Qdrant Cloud
 - **Graph Persistence**: Nodes/edges automatically hydrate from Qdrant so restarts don’t lose context
 
+## 📝 Ingest Options
+
+| Type | Provide | What happens |
+|------|---------|--------------|
+| `note` | Plain text | Text is chunked, embedded, and enriched with entities & keywords. |
+| `link` | URL only | The backend fetches the page, summarizes it via LLM (with fallback if needed), and stores the summary plus link metadata. |
+| `file` | PDF / DOCX / TXT | Files are parsed server-side (PyPDF2 / python-docx) and converted into clean, searchable text. |
+
+Every type supports optional `title` and `description`; additional metadata (e.g., `source_url`, `file_name`) is added automatically.
+
+## 🔗 Relationship Types
+
+| Relationship | When it’s created | Example |
+|--------------|------------------|---------|
+| `updates` | New memory contradicts or supersedes older info, marking the older one as `is_latest = False`. | “You work at Amazon as a Content Engineer” → “You now work at Amazon as the CMO.” |
+| `extends` | New memory enriches an existing fact without replacing it. | “You work at Amazon as the CMO” → “Your work covers SEO, campaigns, and documentation quality.” |
+| `derives` | The system infers a connection based on shared entities/keywords. | “Siddanth is the founder of AI1” + “Siddanth talks about machine learning” ⇒ “AI1 is likely an AI-focused company.” |
+
+Relationships, like memories, are persisted in Qdrant so the graph survives restarts.
+
+## ⚙️ Processing Pipeline
+
+| Stage | What happens |
+|-------|--------------|
+| `queued` | Document received and waiting to be processed |
+| `extracting` | Content gathered from the note/link/file |
+| `chunking` | Semantic chunks created for downstream embeddings |
+| `embedding` | Vectors generated via SentenceTransformers |
+| `indexing` | Memories stored in Qdrant, relationships detected |
+| `done` | Memories are searchable, linked, and hydrated on restart |
+
 ## 🔐 Supabase Authentication
 
 - Every API request now requires a Supabase session token in the `Authorization: Bearer <token>` header.

@@ -364,14 +364,25 @@ class GraphStore:
             if user_id and node_data.get("user_id") != user_id:
                 continue
             memory = self.memories.get(node_id)
-            nodes.append({
+            node_export = {
                 "id": node_id,
                 "label": node_data.get("content", ""),
                 "is_latest": node_data.get("is_latest", True),
                 "is_active": node_data.get("is_active", True),
                 "created_at": node_data.get("created_at"),
                 "full_content": memory.content if memory else ""
-            })
+            }
+            # Include full memory metadata if available
+            if memory:
+                # Use entities_by_type from metadata if available, otherwise convert flat entities list
+                if memory.metadata and "entities_by_type" in memory.metadata:
+                    node_export["entities"] = memory.metadata["entities_by_type"]
+                else:
+                    # Fallback: convert flat entities list to dict format
+                    node_export["entities"] = {"keywords": memory.entities if memory.entities else []}
+                node_export["metadata"] = memory.metadata
+                node_export["document_id"] = memory.document_id
+            nodes.append(node_export)
         
         for source, target, key, edge_data in self.graph.edges(keys=True, data=True):
             if user_id and edge_data.get("user_id") != user_id:
