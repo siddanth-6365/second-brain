@@ -125,6 +125,26 @@ export function MemoryGraph({ height = 600, onNodeClick, className }: MemoryGrap
                         </Button>
                     </div>
 
+                    <div className="absolute bottom-4 right-4 z-10 bg-black/60 backdrop-blur-md p-3 rounded-lg border border-white/10 text-xs text-white/80 space-y-2">
+                        <div className="font-semibold text-white/90 mb-1">Relationships</div>
+                        <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-[#3b82f6]"></span>
+                            <span>Updates</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-[#a855f7]"></span>
+                            <span>Extends</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-[#22c55e]"></span>
+                            <span>Derives</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-[#eab308]"></span>
+                            <span>Similar</span>
+                        </div>
+                    </div>
+
                     <ForceGraph2D
                         ref={fgRef}
                         width={undefined} // Auto-width

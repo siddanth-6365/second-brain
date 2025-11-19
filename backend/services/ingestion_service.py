@@ -142,8 +142,15 @@ class IngestionService:
             
             # Update status: CHUNKING
             document.status = DocumentStatus.CHUNKING
-            chunks = self.chunk_text(content)
-            logger.info(f"Created {len(chunks)} chunks from document")
+            
+            # For link summaries, skip chunking - they're already concise
+            # Chunking would split coherent information unnecessarily
+            if document.document_type == "link" and "link_summary" in document.metadata:
+                chunks = [content]  # Single chunk = full summary
+                logger.info(f"Skipping chunking for link summary (keeping as single memory)")
+            else:
+                chunks = self.chunk_text(content)
+                logger.info(f"Created {len(chunks)} chunks from document")
             
             # Update status: EMBEDDING
             document.status = DocumentStatus.EMBEDDING

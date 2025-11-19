@@ -24,9 +24,9 @@ export default function Dashboard() {
         {/* Hero Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="space-y-1">
-            <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 text-glow">
+            {/* <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 text-glow">
               Second Brain
-            </h1>
+            </h1> */}
             <p className="text-gray-400">Your personal memory expanded by AI</p>
           </div>
           <div className="flex gap-3">

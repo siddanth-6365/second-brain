@@ -24,12 +24,12 @@ export function Navigation() {
       icon: Plus,
       active: pathname === '/ingest'
     },
-    {
-      href: '/search',
-      label: 'Search',
-      icon: Search,
-      active: pathname === '/search'
-    },
+    // {
+    //   href: '/search',
+    //   label: 'Search',
+    //   icon: Search,
+    //   active: pathname === '/search'
+    // },
     {
       href: '/graph',
       label: 'Graph',
