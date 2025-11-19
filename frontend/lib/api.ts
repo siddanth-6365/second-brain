@@ -109,7 +109,7 @@ export const getMemoryTimeline = async (topic: string) => {
 }
 
 // Chat
-export const chat = async (
+export const chatWithMemories = async (
   question: string,
   maxMemories = 5,
   model = 'openai/gpt-oss-20b'
@@ -119,6 +119,16 @@ export const chat = async (
     max_memories: maxMemories,
     model,
   })
+  return response.data
+}
+
+export const getChatHistory = async () => {
+  const response = await api.get('/chat/history')
+  return response.data
+}
+
+export const clearChatHistory = async () => {
+  const response = await api.delete('/chat/history')
   return response.data
 }
 

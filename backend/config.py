@@ -45,8 +45,8 @@ class Settings(BaseSettings):
     chunk_overlap: int = 50
     
     # Relationship Detection
-    similarity_threshold_update: float = 0.70  # High similarity = likely an update
-    similarity_threshold_extend: float = 0.60  # Medium similarity = likely extends
+    similarity_threshold_update: float = 0.65  # High similarity = likely an update
+    similarity_threshold_extend: float = 0.55  # Medium similarity = likely extends
     
     # Memory Tiering Configuration
     hot_memory_age_days: int = 30  # Memories younger than this are "hot"

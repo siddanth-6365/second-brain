@@ -237,7 +237,7 @@ class IngestionService:
             similar_results = self.vector_store.search(
                 query_vector=new_memory.embedding,
                 limit=5,
-                score_threshold=0.65,  # Only consider somewhat similar memories
+                score_threshold=0.55,  # Only consider somewhat similar memories
                 user_id=new_memory.user_id,
             )
             
@@ -318,14 +318,27 @@ class IngestionService:
         
         # Medium similarity = likely extends or adds context
         elif similarity_score >= settings.similarity_threshold_extend:
+            # Check if it's actually an extension or just related
+            # If new memory is much longer, it might be an extension
+            if len(new_memory.content) > len(existing_memory.content) * 1.5:
+                 return MemoryRelationship(
+                    user_id=new_memory.user_id,
+                    from_memory_id=new_memory.id,
+                    to_memory_id=existing_memory.id,
+                    relationship_type=RelationshipType.EXTENDS,
+                    confidence=self._clamp_confidence(similarity_score),
+                    similarity_score=similarity_score,
+                    reason=f"Expands on previous information (similarity: {similarity_score:.2f})"
+                )
+            
             return MemoryRelationship(
                 user_id=new_memory.user_id,
                 from_memory_id=new_memory.id,
                 to_memory_id=existing_memory.id,
-                relationship_type=RelationshipType.EXTENDS,
+                relationship_type=RelationshipType.SIMILAR,
                 confidence=self._clamp_confidence(similarity_score),
                 similarity_score=similarity_score,
-                reason=f"Additional context for related topic (similarity: {similarity_score:.2f})"
+                reason=f"Related content (similarity: {similarity_score:.2f})"
             )
         
         # Lower similarity but still relevant = similar/related
@@ -428,8 +441,8 @@ class IngestionService:
                 
                 # DERIVES criteria:
                 # - Entity similarity > 0.2 (shared entities)
-                # - OR keyword overlap >= 0.3
-                should_derive = entity_similarity > 0.2 or keyword_overlap >= 0.3
+                # - OR keyword overlap >= 0.2
+                should_derive = entity_similarity > 0.2 or keyword_overlap >= 0.2
                 
                 if should_derive:
                     # Combined confidence: weight entity similarity higher

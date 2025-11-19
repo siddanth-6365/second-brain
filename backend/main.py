@@ -302,6 +302,31 @@ class ChatResponse(BaseModel):
     model: str
 
 
+# Chat history storage (in-memory for now)
+chat_history: List[Dict[str, Any]] = []
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+    timestamp: str
+
+class ChatHistoryResponse(BaseModel):
+    history: List[ChatMessage]
+
+@app.get("/chat/history", response_model=ChatHistoryResponse)
+async def get_chat_history(current_user: AuthenticatedUser = Depends(get_current_user)):
+    """Get recent chat history"""
+    return ChatHistoryResponse(history=[
+        ChatMessage(**msg) for msg in chat_history[-50:]  # Return last 50 messages
+    ])
+
+@app.delete("/chat/history")
+async def clear_chat_history(current_user: AuthenticatedUser = Depends(get_current_user)):
+    """Clear chat history"""
+    global chat_history
+    chat_history = []
+    return {"status": "success", "message": "Chat history cleared"}
+
 # Chat endpoint
 @app.post("/chat", response_model=ChatResponse)
 async def chat_with_memories(
@@ -325,9 +350,26 @@ async def chat_with_memories(
         )
     
     if not settings.groq_api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="GROQ_API_KEY not configured. Please set it in your .env file"
+        # Mock response for development if no key
+        logger.warning("GROQ_API_KEY not set. Returning mock response.")
+        mock_answer = "I can't access the LLM right now because the API key is missing. However, I found some relevant memories."
+        
+        # Search anyway to show memories
+        search_service = get_search_service()
+        search_query = SearchQuery(
+            query=request.question,
+            limit=request.max_memories,
+            only_latest=True
+        )
+        search_results = await search_service.search(search_query, user_id=current_user.id)
+        memory_ids = [r.memory.id for r in search_results]
+        
+        return ChatResponse(
+            question=request.question,
+            answer=mock_answer,
+            memories_used=memory_ids,
+            memory_count=len(memory_ids),
+            model="mock"
         )
     
     try:
@@ -342,9 +384,23 @@ async def chat_with_memories(
         search_results = await search_service.search(search_query, user_id=current_user.id)
         
         if not search_results:
+            answer = "I don't have any memories related to your question yet. Try adding some documents first!"
+            
+            # Save to history
+            chat_history.append({
+                "role": "user",
+                "content": request.question,
+                "timestamp": dt.utcnow().isoformat()
+            })
+            chat_history.append({
+                "role": "assistant",
+                "content": answer,
+                "timestamp": dt.utcnow().isoformat()
+            })
+            
             return ChatResponse(
                 question=request.question,
-                answer="I don't have any memories related to your question yet. Try adding some documents first!",
+                answer=answer,
                 memories_used=[],
                 memory_count=0,
                 model=request.model
@@ -396,6 +452,18 @@ Please provide a helpful answer based on the memories above."""
         
         answer = chat_completion.choices[0].message.content
         
+        # Save to history
+        chat_history.append({
+            "role": "user",
+            "content": request.question,
+            "timestamp": dt.utcnow().isoformat()
+        })
+        chat_history.append({
+            "role": "assistant",
+            "content": answer,
+            "timestamp": dt.utcnow().isoformat()
+        })
+        
         return ChatResponse(
             question=request.question,
             answer=answer,
@@ -419,6 +487,7 @@ async def clear_all_data(current_user: AuthenticatedUser = Depends(get_current_u
     - Delete all memories from vector store
     - Clear the knowledge graph
     - Reset all data
+    - Clear chat history
     
     This operation cannot be undone!
     """
@@ -433,6 +502,10 @@ async def clear_all_data(current_user: AuthenticatedUser = Depends(get_current_u
         # Remove graph data for this user
         removal_stats = graph_store.clear_user_data(current_user.id)
         memory_tiering.remove_memories(removal_stats.get("memory_ids", []))
+        
+        # Clear chat history
+        global chat_history
+        chat_history = []
         
         logger.info("Cleared data for user %s", current_user.id)
         

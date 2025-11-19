@@ -40,6 +40,12 @@ class EntityService:
             'city', 'town', 'state', 'country', 'region', 'province',
             'district', 'avenue', 'street', 'road', 'boulevard'
         }
+
+        self.product_indicators = {
+            'mouse', 'keyboard', 'laptop', 'headset', 'monitor', 'screen',
+            'sensor', 'dpi', 'wireless', 'bluetooth', 'usb', 'ergonomic',
+            'gaming', 'productivity', 'device', 'hardware'
+        }
     
     def extract_entities(self, text: str) -> Dict[str, Set[str]]:
         """
@@ -60,6 +66,7 @@ class EntityService:
             'persons': set(),
             'organizations': set(),
             'locations': set(),
+            'products': set(),  # New category
             'keywords': set()
         }
         
@@ -93,9 +100,18 @@ class EntityService:
             # Check for location indicators
             elif any(indicator in word_lower for indicator in self.location_indicators):
                 entities['locations'].add(word)
+            # Check for product indicators
+            elif any(indicator in word_lower for indicator in self.product_indicators):
+                entities['products'].add(word)
             # Generic proper noun
             else:
                 entities['keywords'].add(word)
+        
+        # Also scan for product keywords in lowercase text to catch things like "mouse"
+        text_lower = text.lower()
+        for indicator in self.product_indicators:
+            if indicator in text_lower:
+                entities['products'].add(indicator)
         
         return entities
     
@@ -151,13 +167,14 @@ class EntityService:
             Similarity score (0.0 to 1.0)
         """
         weights = {
-            'persons': 0.3,
-            'organizations': 0.3,
-            'locations': 0.2,
+            'persons': 0.25,
+            'organizations': 0.25,
+            'locations': 0.15,
+            'products': 0.25,  # High weight for products
             'emails': 0.05,
             'urls': 0.05,
             'phones': 0.05,
-            'dates': 0.0,  # Dates are less important for relationship detection
+            'dates': 0.0,
             'numbers': 0.0,
             'keywords': 0.1
         }
