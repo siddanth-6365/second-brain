@@ -26,6 +26,17 @@ export default function IngestPage() {
   const [success, setSuccess] = useState(false)
   const { toast } = useToast()
 
+  const isValidUrl = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) return false
+    try {
+      const url = new URL(trimmed)
+      return url.protocol === 'http:' || url.protocol === 'https:'
+    } catch {
+      return false
+    }
+  }
+
   const extractEntitiesPreview = (text: string) => {
     // Simple entity extraction preview (regex-based)
     const extracted: Record<string, string[]> = {
@@ -93,13 +104,16 @@ export default function IngestPage() {
       return
     }
 
-    if (mode === 'link' && !linkUrl.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please enter a valid link',
-        variant: 'destructive',
-      })
-      return
+    if (mode === 'link') {
+      const trimmed = linkUrl.trim()
+      if (!trimmed || !isValidUrl(trimmed)) {
+        toast({
+          title: 'Error',
+          description: 'Please enter a valid URL (including http:// or https://)',
+          variant: 'destructive',
+        })
+        return
+      }
     }
 
     if (mode === 'file' && !selectedFile) {
@@ -234,6 +248,9 @@ export default function IngestPage() {
                       onChange={(e) => setLinkUrl(e.target.value)}
                       className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                     />
+                    {linkUrl && !isValidUrl(linkUrl) && (
+                      <p className="text-xs text-red-400">Please enter a valid URL including http:// or https://</p>
+                    )}
                   </div>
                 )}
 
@@ -261,7 +278,7 @@ export default function IngestPage() {
                   disabled={
                     loading ||
                     (mode === 'note' && !content.trim()) ||
-                    (mode === 'link' && !linkUrl.trim()) ||
+                    (mode === 'link' && (!linkUrl.trim() || !isValidUrl(linkUrl))) ||
                     (mode === 'file' && !selectedFile)
                   }
                   className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50"

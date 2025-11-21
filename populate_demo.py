@@ -38,6 +38,15 @@ DEMO_DATA = [
         "content": "TypeScript is a free and open-source high-level programming language developed by Microsoft that adds static typing with optional type annotations to JavaScript.",
         "type": "note"
     },
+    {
+        "title": "React",
+        "content": "React is a free and open-source high-level programming language developed by Microsoft that adds static typing with optional type annotations to JavaScript.",
+        "type": "note"
+    },{
+        "title": "Node.js",
+        "content": "Node.js is a free and open-source high-level programming language developed by Microsoft that adds static typing with optional type annotations to JavaScript.",
+        "type": "note"
+    },
 
     # Cluster 3: Tech Products (Interconnected with Programming and each other)
     {
@@ -49,6 +58,23 @@ DEMO_DATA = [
         "title": "VS Code",
         "content": "Visual Studio Code, also commonly referred to as VS Code, is a source-code editor made by Microsoft. It supports Python, Rust, and TypeScript via extensions.",
         "type": "note"
+    },
+
+    # cluster 4: mouese links
+    {
+        "title": "protoarc mouse",
+        "type": "link",
+        "url": "https://www.protoarc.com/collections/mice/products/em11-nl-vertical-mouse?variant=42318201716825"
+    },
+    {
+        "title": "logitech mouse",
+        "type": "link",
+        "url": "https://www.logitech.com/en-in/shop/p/mx-master-3s"
+    },
+      {
+        "title": "razer mouse",
+        "type": "link",
+        "url": "https://www.razer.com/p/RZ01-05120200-R3U1?cid=ecom_store"
     }
 ]
 
