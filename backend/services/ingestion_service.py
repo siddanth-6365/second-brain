@@ -550,6 +550,10 @@ class IngestionService:
         text = (text or "").strip()
         if entry_type == "link" and len(text) < 10:
             text = (original_text or "")[:1000] or f"Link reference: {link_url}"
+        
+        # Prepend URL to content for link types so it's included in embeddings
+        if entry_type == "link" and link_url:
+            text = f"Source URL: {link_url}\n\n{text}"
         if len(text) < 10:
             raise ValueError("Content too short. Please provide at least 10 characters.")
         if len(text) > 1_000_000:

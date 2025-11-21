@@ -75,6 +75,10 @@ DEMO_DATA = [
         "title": "razer mouse",
         "type": "link",
         "url": "https://www.razer.com/p/RZ01-05120200-R3U1?cid=ecom_store"
+    },{
+        "title": "zebronics mouse",
+        "type": "link",
+        "url": "https://shop.zebronics.com/products/zeb-jaguar?variant=43466927898857&country=IN&currency=INR&utm_medium=product_sync&utm_source=google&utm_content=sag_organic&utm_campaign=sag_organic"
     }
 ]
 
